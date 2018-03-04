@@ -47,7 +47,7 @@ jobs:
           name: install Pod dependencies
           command: |
             export CP_REPOS_DIR=./pods
-            bundle exec pod install
+            bundle exec pod setup
 
       - save_cache:
           paths:
