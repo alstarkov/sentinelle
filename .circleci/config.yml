@@ -1,0 +1,45 @@
+# iOS CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/ios-migrating-from-1-2/ for more details
+#
+version: 2
+
+jobs:
+  build:
+
+    # Specify the Xcode version to use
+    macos:
+      xcode: "9"
+
+    steps:
+      - checkout
+
+      # Install CocoaPods
+      - run:
+          name: Install CocoaPods
+          command: pod repo update
+
+      # Scan pods and calculate stats
+      - run:
+          name: Build and run tests
+          command: ls -la ~/.cocoapods/repos
+
+#      - store_artifacts:
+#          path: /tmp/test-results
+#          destination: scan-test-results
+
+workflows:
+  version: 2
+  commit:
+    jobs:
+      - build
+  heartbits:
+    triggers:
+      - schedule:
+          cron: "1,6,11,16,21,26,31,36,41,46,51,56 * * * *"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - build
