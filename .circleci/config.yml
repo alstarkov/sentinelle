@@ -39,10 +39,9 @@ jobs:
       - run:
           name: run scan
           command: |
-            bundle exec pod repo update
-            pwd $GEM_HOME
-            ls -la $GEM_HOME/..
-            env
+            export CP_HOME_DIR=pods
+            bundle exec pod repo update --verbose
+            ls -la pods/repos
 
 #      - store_artifacts:
 #          path: /tmp/test-results
