@@ -19,29 +19,46 @@ jobs:
     steps:
       - checkout
 
-      # Download and cache dependencies
+      # Download and cache Gem dependencies
       - restore_cache:
           keys:
-          - v1-dependencies-{{ checksum "Gemfile" }}
+          - v1-gem-dependencies-{{ checksum "Gemfile" }}
           # fallback to using the latest cache if no exact match is found
-          - v1-dependencies-
+          - v1-gem-dependencies-
 
       - run:
-          name: install dependencies
+          name: install Gem dependencies
           command: |
-            bundle install --jobs=4 --retry=3 --path vendor/bundle
+          bundle install --jobs=4 --retry=3 --path vendor/bundle
 
       - save_cache:
           paths:
             - ./vendor/bundle
-          key: v1-dependencies-{{ checksum "Gemfile" }}
+          key: v1-gem-dependencies-{{ checksum "Gemfile" }}
+
+      # Download and cache Pod dependencies
+      - restore_cache:
+          keys:
+          - v1-pod-dependencies-{{ checksum "Podfile" }}
+          # fallback to using the latest cache if no exact match is found
+          - v1-pod-dependencies-
+
+      - run:
+          name: install Pod dependencies
+          command: |
+            export CP_REPOS_DIR=./pods
+            bundle exec pod install
+
+      - save_cache:
+          paths:
+            - ./pods
+          key: v1-pod-dependencies-{{ checksum "Podfile" }}
 
       - run:
           name: run scan
           command: |
-            export CP_HOME_DIR=pods
-            bundle exec pod repo update --verbose
-            ls -la pods/repos
+            ls -la
+            ls -la pods
 
 #      - store_artifacts:
 #          path: /tmp/test-results
