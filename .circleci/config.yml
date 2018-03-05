@@ -8,75 +8,48 @@ jobs:
     docker:
       # specify the version you desire here
        - image: circleci/ruby:2.4.1-node-browsers
-      
-      # Specify service dependencies here if necessary
-      # CircleCI maintains a library of pre-built images
-      # documented at https://circleci.com/docs/2.0/circleci-images/
-      # - image: circleci/postgres:9.4
 
     working_directory: ~/repo
     no_output_timeout: 2m
 
     steps:
-      - checkout
-
-      # Download and cache Gem dependencies
-      - restore_cache:
-          keys:
-          - v1-gem-dependencies-{{ checksum "Gemfile" }}
-          # fallback to using the latest cache if no exact match is found
-          - v1-gem-dependencies-
-
-      - run:
-          name: install Gem dependencies
-          command: |
-            bundle install --jobs=4 --retry=3 --path vendor/bundle
-
-      - save_cache:
-          paths:
-            - ./vendor/bundle
-          key: v1-gem-dependencies-{{ checksum "Gemfile" }}
-
       # Download and cache Pod dependencies
       - restore_cache:
           keys:
-          - v1-pod-dependencies-{{ checksum "Podfile" }}
-          # fallback to using the latest cache if no exact match is found
-          - v1-pod-dependencies-
-
-      - run:
-          name: install Pod dependencies
-          command: |
-            export CP_REPOS_DIR=./pods
-            bundle exec pod setup
-
-      - save_cache:
-          paths:
-            - ./pods
-          key: v1-pod-dependencies-{{ checksum "Podfile" }}
-
-      # Download and cache Pod dependencies
-      - restore_cache:
-          keys:
-          - v1-commit-dependencies-{{ checksum ".circleci/config.yml" }}
-          # fallback to using the latest cache if no exact match is found
           - v1-commit-dependencies-
 
       - run:
           name: run scan
           command: |
-            git diff --name-only $(cat lastScannedCommit)
-            # SCAN
-            git rev-parse HEAD > lastScannedCommit
+            export lastCommit=$(curl https://api.github.com/repos/CocoaPods/Specs/git/refs/heads/master)
+
+            curl https://api.github.com/repos/CocoaPods/Specs/compare/$(cat lastScannedCommit)...$lastCommit  2>/dev/null \
+            | grep filename \
+            | sed 's/.podspec.json//g' \
+            | cut -d'"' -f 4 \
+            | rev | cut -d'/' -f -1 -f 2 | rev \
+            | sed 's,\(.*\)\(/\)\(.*\),\3\2\1,g' \
+            | sort |
+            > updates
+            
+            if [ -z "$ANALYSER_URL" ]
+            then
+                export METHOD=$([ $(stat --printf="%s" updates) -ge 5000 ] && echo GET || echo POST) # Use GET for large files
+                curl -d "@updates" -X $METHOD ${ANALYSER_URL}
+            fi
+
+            echo $lastCommit > ./lastScannedCommit
 
       - save_cache:
           paths:
             - ./lastScannedCommit
-          key: v1-commit-dependencies-{{ checksum ".circleci/config.yml" }}
+          key: v1-commit-dependencies-
 
       - store_artifacts:
           path: lastScannedCommit
-          destination: status
+      - store_artifacts:
+          path: updates
+
 
 workflows:
   version: 2
