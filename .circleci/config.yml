@@ -5,7 +5,6 @@ jobs:
     docker:
        - image: circleci/ruby:2.4.1-node-browsers
     environment:
-       - UPDATES_FILE: updates
        - SPECS_REPO: https://api.github.com/repos/CocoaPods/Specs
 
     working_directory: ~/repo
@@ -20,7 +19,6 @@ jobs:
       - run:
           name: run scan
           command: |
-            set -x
 
             ls -la # DBG - Does updates exist?
             echo "========"
@@ -30,6 +28,7 @@ jobs:
                                  | cut -d'"' -f 4)
 
             compareTo () {
+                echo Comparing $(cat lastScannedCommit)...$1 
                 curl ${SPECS_REPO}/compare/$(cat lastScannedCommit)...$1?access_token=${GITHUB_TOKEN} \
                 | grep filename \
                 | cut -d'"' -f 4 \
@@ -39,11 +38,11 @@ jobs:
             }
 
             listUpdatesTo () {
-                compareTo $1 > ${UPDATES_FILE}
+                compareTo $1 > updates
             }
 
             isNotTooMuch () {
-                [ $(stat --printf="%s" ${UPDATES_FILE}) -le 50000 ]
+                [ $(stat --printf="%s" updates) -le 50000 ]
             }
 
             if listUpdatesTo $MASTER_HEAD && isNotTooMuch; then
@@ -51,6 +50,8 @@ jobs:
             else
                 export METHOD=GET
             fi
+            
+            echo $METHOD
 
             curl -d "@updates" -X $METHOD ${ANALYSER_URL}
 
@@ -64,7 +65,7 @@ jobs:
       - store_artifacts:
           path: lastScannedCommit
       - store_artifacts:
-          path: ${UPDATES_FILE}
+          path: updates
 
 
 workflows:
