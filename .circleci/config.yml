@@ -1,13 +1,12 @@
-# Ruby CircleCI 2.0 configuration file
-#
 # Check https://circleci.com/docs/2.0/language-ruby/ for more details
-#
 version: 2
 jobs:
   build:
     docker:
-      # specify the version you desire here
        - image: circleci/ruby:2.4.1-node-browsers
+        environment:
+          UPDATES_FILE: updates
+          SPECS_REPO: https://api.github.com/repos/CocoaPods/Specs
 
     working_directory: ~/repo
     no_output_timeout: 2m
@@ -21,31 +20,41 @@ jobs:
       - run:
           name: run scan
           command: |
+            set -x
 
-            lastCommit () {
-                curl https://api.github.com/repos/CocoaPods/Specs/git/refs/heads/master?access_token=${GITHUB_TOKEN} | grep '"sha"' | cut -d'"' -f 4
-            }
+            ls -la # DBG - Does updates exist?
+            echo "========"
 
-            updates () {
-                curl https://api.github.com/repos/CocoaPods/Specs/compare/$(cat lastScannedCommit)...$1?access_token=${GITHUB_TOKEN} \
+            export MASTER_HEAD=$(curl ${SPECS_REPO}/git/refs/heads/master?access_token=${GITHUB_TOKEN} \
+                                 | grep '"sha"' \
+                                 | cut -d'"' -f 4)
+
+            compareTo () {
+                curl ${SPECS_REPO}/compare/$(cat lastScannedCommit)...$1?access_token=${GITHUB_TOKEN} \
                 | grep filename \
                 | cut -d'"' -f 4 \
                 | xargs dirname \
                 | rev | cut -d'/' -f -2 | rev \
                 | sort
             }
-            
-            ls -la # Does updates exist?
-            echo "========"
-            
-            export previousCommit=$(lastCommit)
 
-            # Only post if updates found and not too much
-            [ updates $previousCommit > updates ] && [ $(stat --printf="%s" updates) -le 5000 ] && export METHOD=POST || export METHOD=GET
-            
-            [ -z "$ANALYSER_URL" ] && curl -d "@updates" -X $METHOD ${ANALYSER_URL}
+            listUpdatesTo () {
+                $(compareTo $1) > ${UPDATES_FILE}
+            }
 
-            echo $previousCommit > ./lastScannedCommit
+            isNotTooMuch () {
+                [ $(stat --printf="%s" ${UPDATES_FILE}) -le 50000 ]
+            }
+
+            if listUpdatesTo $MASTER_HEAD && isNotTooMuch; then
+                export METHOD=POST
+            else
+                export METHOD=GET
+            fi
+
+            curl -d "@updates" -X $METHOD ${ANALYSER_URL}
+
+            echo $MASTER_HEAD > ./lastScannedCommit
 
       - save_cache:
           paths:
@@ -55,7 +64,7 @@ jobs:
       - store_artifacts:
           path: lastScannedCommit
       - store_artifacts:
-          path: updates
+          path: ${UPDATES_FILE}
 
 
 workflows:
