@@ -4,9 +4,9 @@ jobs:
   build:
     docker:
        - image: circleci/ruby:2.4.1-node-browsers
-        environment:
-          UPDATES_FILE: updates
-          SPECS_REPO: https://api.github.com/repos/CocoaPods/Specs
+    environment:
+       - UPDATES_FILE: updates
+       - SPECS_REPO: https://api.github.com/repos/CocoaPods/Specs
 
     working_directory: ~/repo
     no_output_timeout: 2m
