@@ -55,15 +55,28 @@ jobs:
             - ./pods
           key: v1-pod-dependencies-{{ checksum "Podfile" }}
 
+      # Download and cache Pod dependencies
+      - restore_cache:
+          keys:
+          - v1-commit-dependencies-{{ checksum ".circleci/config.yml" }}
+          # fallback to using the latest cache if no exact match is found
+          - v1-commit-dependencies-
+
       - run:
           name: run scan
           command: |
-            ls -la
-            ls -la pods
+            git diff --name-only $(cat lastScannedCommit)
+            # SCAN
+            git rev-parse HEAD > lastScannedCommit
 
-#      - store_artifacts:
-#          path: /tmp/test-results
-#          destination: test-results
+      - save_cache:
+          paths:
+            - ./lastScannedCommit
+          key: v1-commit-dependencies-{{ checksum ".circleci/config.yml" }}
+
+      - store_artifacts:
+          path: lastScannedCommit
+          destination: status
 
 workflows:
   version: 2
@@ -73,7 +86,7 @@ workflows:
   heartbits:
     triggers:
       - schedule:
-          cron: "1 * * 1,2,3,4,5 *"
+          cron: "1 5 * 1,2,3,4,5 *"
           filters:
             branches:
               only:
