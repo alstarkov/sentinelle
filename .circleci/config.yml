@@ -27,18 +27,16 @@ jobs:
                                  | grep '"sha"' \
                                  | cut -d'"' -f 4)
 
-            compareTo () {
-                echo Comparing $(cat lastScannedCommit)...$1 
+            listUpdatesTo () {
+                echo Comparing $(cat lastScannedCommit)...$1
+
                 curl ${SPECS_REPO}/compare/$(cat lastScannedCommit)...$1?access_token=${GITHUB_TOKEN} \
                 | grep filename \
                 | cut -d'"' -f 4 \
                 | xargs dirname \
                 | rev | cut -d'/' -f -2 | rev \
-                | sort
-            }
-
-            listUpdatesTo () {
-                compareTo $1 > updates
+                | sort \
+                > updates
             }
 
             isNotTooMuch () {
