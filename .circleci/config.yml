@@ -39,7 +39,7 @@ jobs:
             }
 
             listUpdatesTo () {
-                $(compareTo $1) > ${UPDATES_FILE}
+                compareTo $1 > ${UPDATES_FILE}
             }
 
             isNotTooMuch () {
