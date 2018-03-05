@@ -1,52 +1,68 @@
-# Ruby CircleCI 2.0 configuration file
-#
 # Check https://circleci.com/docs/2.0/language-ruby/ for more details
-#
 version: 2
 jobs:
   build:
     docker:
-      # specify the version you desire here
        - image: circleci/ruby:2.4.1-node-browsers
-      
-      # Specify service dependencies here if necessary
-      # CircleCI maintains a library of pre-built images
-      # documented at https://circleci.com/docs/2.0/circleci-images/
-      # - image: circleci/postgres:9.4
+    environment:
+       - SPECS_REPO: https://api.github.com/repos/CocoaPods/Specs
 
     working_directory: ~/repo
+    no_output_timeout: 2m
 
     steps:
-      - checkout
-
-      # Download and cache dependencies
+      # Download and cache Pod dependencies
       - restore_cache:
           keys:
-          - v1-dependencies-{{ checksum "Gemfile" }}
-          # fallback to using the latest cache if no exact match is found
-          - v1-dependencies-
-
-      - run:
-          name: install dependencies
-          command: |
-            bundle install --jobs=4 --retry=3 --path vendor/bundle
-
-      - save_cache:
-          paths:
-            - ./vendor/bundle
-          key: v1-dependencies-{{ checksum "Gemfile" }}
+          - v1-commit-dependencies-
 
       - run:
           name: run scan
           command: |
-            bundle exec pod repo update
-            pwd $GEM_HOME
-            ls -la $GEM_HOME/..
-            env
 
-#      - store_artifacts:
-#          path: /tmp/test-results
-#          destination: test-results
+            ls -la # DBG - Does updates exist?
+            echo "========"
+
+            listUpdatesTo () {
+                echo Comparing $(cat lastScannedCommit)...$1
+
+                curl ${SPECS_REPO}/compare/$(cat lastScannedCommit)...$1?access_token=${GITHUB_TOKEN} \
+                | grep filename \
+                | cut -d'"' -f 4 \
+                | xargs dirname \
+                | rev | cut -d'/' -f -2 | rev \
+                | sort \
+                > updates
+            }
+
+            isNotTooMuch () {
+                [ $(stat --printf="%s" updates) -le 50000 ]
+            }
+
+            export MASTER_HEAD=$(curl ${SPECS_REPO}/git/refs/heads/master?access_token=${GITHUB_TOKEN} \
+                                 | grep '"sha"' \
+                                 | cut -d'"' -f 4)
+
+            if listUpdatesTo $MASTER_HEAD && isNotTooMuch; then
+                echo POST
+                curl -d "@updates" -X POST ${ANALYSER_URL}
+            else
+                echo GET
+                curl ${ANALYSER_URL}
+            fi
+
+            echo $MASTER_HEAD > ./lastScannedCommit
+
+      - save_cache:
+          paths:
+            - ./lastScannedCommit
+          key: v1-commit-dependencies-
+
+      - store_artifacts:
+          path: lastScannedCommit
+      - store_artifacts:
+          path: updates
+
 
 workflows:
   version: 2
@@ -56,7 +72,7 @@ workflows:
   heartbits:
     triggers:
       - schedule:
-          cron: "1 * * * *"
+          cron: "1 5 * 1,2,3,4,5 *"
           filters:
             branches:
               only:
