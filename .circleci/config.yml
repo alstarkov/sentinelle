@@ -23,10 +23,6 @@ jobs:
             ls -la # DBG - Does updates exist?
             echo "========"
 
-            export MASTER_HEAD=$(curl ${SPECS_REPO}/git/refs/heads/master?access_token=${GITHUB_TOKEN} \
-                                 | grep '"sha"' \
-                                 | cut -d'"' -f 4)
-
             listUpdatesTo () {
                 echo Comparing $(cat lastScannedCommit)...$1
 
@@ -43,15 +39,17 @@ jobs:
                 [ $(stat --printf="%s" updates) -le 50000 ]
             }
 
-            if listUpdatesTo $MASTER_HEAD && isNotTooMuch; then
-                export METHOD=POST
-            else
-                export METHOD=GET
-            fi
-            
-            echo $METHOD
+            export MASTER_HEAD=$(curl ${SPECS_REPO}/git/refs/heads/master?access_token=${GITHUB_TOKEN} \
+                                 | grep '"sha"' \
+                                 | cut -d'"' -f 4)
 
-            curl -d "@updates" -X $METHOD ${ANALYSER_URL}
+            if listUpdatesTo $MASTER_HEAD && isNotTooMuch; then
+                echo POST
+                curl -d "@updates" -X POST ${ANALYSER_URL}
+            else
+                echo GET
+                curl ${ANALYSER_URL}
+            fi
 
             echo $MASTER_HEAD > ./lastScannedCommit
 
