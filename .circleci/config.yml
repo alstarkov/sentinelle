@@ -21,24 +21,31 @@ jobs:
       - run:
           name: run scan
           command: |
-            export lastCommit=$(curl https://api.github.com/repos/CocoaPods/Specs/git/refs/heads/master)
 
-            curl https://api.github.com/repos/CocoaPods/Specs/compare/$(cat lastScannedCommit)...$lastCommit  2>/dev/null \
-            | grep filename \
-            | sed 's/.podspec.json//g' \
-            | cut -d'"' -f 4 \
-            | rev | cut -d'/' -f -1 -f 2 | rev \
-            | sed 's,\(.*\)\(/\)\(.*\),\3\2\1,g' \
-            | sort |
-            > updates
+            lastCommit () {
+                curl https://api.github.com/repos/CocoaPods/Specs/git/refs/heads/master?access_token=${GITHUB_TOKEN} | grep '"sha"' | cut -d'"' -f 4
+            }
+
+            updates () {
+                curl https://api.github.com/repos/CocoaPods/Specs/compare/$(cat lastScannedCommit)...$1?access_token=${GITHUB_TOKEN} \
+                | grep filename \
+                | cut -d'"' -f 4 \
+                | xargs dirname \
+                | rev | cut -d'/' -f -2 | rev \
+                | sort
+            }
             
-            if [ -z "$ANALYSER_URL" ]
-            then
-                export METHOD=$([ $(stat --printf="%s" updates) -ge 5000 ] && echo GET || echo POST) # Use GET for large files
-                curl -d "@updates" -X $METHOD ${ANALYSER_URL}
-            fi
+            ls -la # Does updates exist?
+            echo "========"
+            
+            export previousCommit=$(lastCommit)
 
-            echo $lastCommit > ./lastScannedCommit
+            # Only post if updates found and not too much
+            [ updates $previousCommit > updates ] && [ $(stat --printf="%s" updates) -le 5000 ] && export METHOD=POST || export METHOD=GET
+            
+            [ -z "$ANALYSER_URL" ] && curl -d "@updates" -X $METHOD ${ANALYSER_URL}
+
+            echo $previousCommit > ./lastScannedCommit
 
       - save_cache:
           paths:
